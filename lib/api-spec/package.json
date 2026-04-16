@@ -1,0 +1,16 @@
+{
+  "name": "@workspace/api-spec",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "codegen": "node orval-run2.mjs"
+  },
+  "devDependencies": {
+    "orval": "^8.5.2",
+    "tsx": "catalog:"
+  },
+  "dependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "js-yaml": "^4.1.1"
+  }
+}
