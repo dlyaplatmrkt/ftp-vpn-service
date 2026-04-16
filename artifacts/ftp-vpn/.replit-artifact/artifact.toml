@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "FTP VPN"
+version = "1.0.0"
+id = "artifacts/ftp-vpn"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24822
+
+[services.development]
+run = "pnpm --filter @workspace/ftp-vpn run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ftp-vpn", "run", "build" ]
+publicDir = "artifacts/ftp-vpn/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24822"
+BASE_PATH = "/"

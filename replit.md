@@ -1,8 +1,18 @@
-# FTP VPN — Анонимный VPN-сервис
+# FTP VPN Service
 
 ## Overview
 
-Полноценный VPN-сервис с личным кабинетом, автовыдачей конфигов AmnesiaWG (WireGuard), оплатой через CryptoBot и СБП. Максимальная анонимность — вход только по сгенерированному ключу (без email, имён, телефонов).
+FTP VPN — приватный VPN-сервис на подписке, продаётся по лицензионным ключам (без email и личных данных).
+
+## Features
+
+- Вход по ключу формата XXXX-XXXX-XXXX-XXXX
+- Демо-доступ: ключ `DEMO-TEST-USER-0001`
+- Личный кабинет с состоянием подписки, статистикой
+- Автовыдача WireGuard/AmnesiaWG конфигов для 5 локаций (NL, DE, FI, FR, US)
+- Оплата через CryptoBot (USDT)
+- Оплата через СБП (QR-код)
+- Тарифы: Старт (30д/199₽), Стандарт (90д/499₽), Про (180д/899₽)
 
 ## Stack
 
@@ -10,23 +20,11 @@
 - **Node.js version**: 24
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
-- **Frontend**: React + Vite (artifacts/vpn-dashboard)
+- **Frontend**: React + Vite (artifacts/ftp-vpn)
 - **API framework**: Express 5 (artifacts/api-server)
 - **Database**: PostgreSQL + Drizzle ORM
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec via custom JS loader)
-- **Build**: esbuild (CJS bundle)
-- **UI**: shadcn/ui + Tailwind + cyberpunk neon theme
-
-## Features
-
-- **Anonymous auth**: Access key login (XXXX-XXXX-XXXX-XXXX), no personal data
-- **VPN Configs**: Auto-generate AmnesiaWG/WireGuard configs for multiple server locations
-- **Subscription plans**: Monthly/quarterly/semi-annual plans
-- **Payment via CryptoBot**: USDT payment via Telegram CryptoBot
-- **Payment via СБП**: Russian fast payment system (QR code)
-- **Dashboard**: Stats overview, subscription status, days remaining
-- **Dark cyberpunk UI**: Neon cyan-to-purple gradient, glowing elements
+- **API codegen**: Orval (from OpenAPI spec)
 
 ## Key Commands
 
@@ -35,38 +33,20 @@
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
-- `pnpm --filter @workspace/vpn-dashboard run dev` — run frontend locally
+
+## Environment Variables
+
+- `DATABASE_URL` — PostgreSQL connection string (auto-provisioned)
+- `CRYPTO_BOT_TOKEN` — CryptoBot API token (for live USDT payments)
+- `SBP_PHONE` — Phone number for SBP payments (e.g. `+7 (900) 000-00-00`)
+- `SBP_BANK` — Bank name for SBP (e.g. `Тинькофф`)
+- `SESSION_SECRET` — Session secret
+
+## Auth
+
+Auth is key-based: user submits license key → stored in `localStorage('ftp_vpn_license_key')` → sent as `x-license-key` header on all API requests.
 
 ## Database Schema
 
-- `users` — anonymous users with access keys
-- `sessions` — auth tokens (30 days TTL)
-- `subscription_plans` — available VPN plans
-- `subscriptions` — user subscriptions
-- `vpn_configs` — WireGuard config records per user
-- `payments` — payment records (crypto + СБП)
-
-## API Routes
-
-- `POST /api/auth/login` — login with access key
-- `POST /api/auth/logout` — logout
-- `GET /api/auth/me` — current user info
-- `GET /api/subscriptions/plans` — list plans
-- `GET /api/subscriptions/current` — current subscription
-- `GET/POST /api/configs` — list/generate VPN configs
-- `GET/DELETE /api/configs/:id` — get/delete config
-- `GET /api/configs/:id/download` — download .conf file
-- `POST /api/payments/crypto/create` — create CryptoBot invoice
-- `POST /api/payments/sbp/create` — create СБП payment
-- `GET /api/payments/status/:id` — check payment status
-- `GET /api/user/stats` — user dashboard stats
-
-## Demo Access
-
-Access key: `DEMO-TEST-USER-0001`
-
-## Codegen Notes
-
-Orval has a quirk with TypeScript config files. The codegen uses `orval-run2.mjs` (custom Node.js script in lib/api-spec/) that directly calls the Orval JS API with an absolute path to openapi.yaml.
-
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+- `subscriptions` — license keys with plan/status/expiry
+- `payments` — payment invoices (cryptobot/sbp)

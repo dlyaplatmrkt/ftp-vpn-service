@@ -1,24 +1,23 @@
-import { pgTable, serial, integer, text, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { usersTable } from "./users";
-import { subscriptionPlansTable } from "./subscription_plans";
+
+export const paymentStatusEnum = pgEnum("payment_status", ["pending", "paid", "expired", "failed"]);
+export const paymentMethodEnum = pgEnum("payment_method", ["cryptobot", "sbp"]);
 
 export const paymentsTable = pgTable("payments", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => usersTable.id).notNull(),
-  planId: integer("plan_id").references(() => subscriptionPlansTable.id).notNull(),
-  method: text("method").notNull(), // crypto, sbp
-  status: text("status").notNull().default("pending"), // pending, paid, expired, failed
+  invoiceId: text("invoice_id").notNull().unique(),
+  externalInvoiceId: text("external_invoice_id"),
+  licenseKey: text("license_key").notNull(),
+  planId: text("plan_id").notNull(),
+  method: paymentMethodEnum("method").notNull(),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   currency: text("currency").notNull(),
-  externalId: text("external_id"), // CryptoBot invoice ID or SBP payment ID
-  invoiceUrl: text("invoice_url"),
-  qrUrl: text("qr_url"),
-  bankName: text("bank_name"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
+  status: paymentStatusEnum("status").notNull().default("pending"),
   paidAt: timestamp("paid_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertPaymentSchema = createInsertSchema(paymentsTable).omit({ id: true, createdAt: true });

@@ -1,9 +1,8 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: FTP VPN Service API
+  description: FTP VPN API
 servers:
   - url: /api
     description: Base API path
@@ -11,13 +10,11 @@ tags:
   - name: health
     description: Health operations
   - name: auth
-    description: Authentication via access key
-  - name: user
-    description: User account operations
-  - name: subscriptions
-    description: Subscription plans and management
+    description: Authentication
+  - name: subscription
+    description: Subscription management
   - name: configs
-    description: VPN configuration management
+    description: VPN configuration files
   - name: payments
     description: Payment operations
 paths:
@@ -36,9 +33,9 @@ paths:
 
   /auth/login:
     post:
-      operationId: loginWithKey
+      operationId: login
       tags: [auth]
-      summary: Login with access key
+      summary: Login with license key
       requestBody:
         required: true
         content:
@@ -51,63 +48,77 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LoginResponse"
+                $ref: "#/components/schemas/LoginResult"
         "401":
           description: Invalid key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /auth/logout:
     post:
       operationId: logout
       tags: [auth]
-      summary: Logout current session
+      summary: Logout
       responses:
         "200":
           description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
 
   /auth/me:
     get:
       operationId: getMe
       tags: [auth]
-      summary: Get current user info
+      summary: Get current user
       responses:
         "200":
-          description: Current user
+          description: Current user info
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/UserInfo"
         "401":
           description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
-  /subscriptions/plans:
+  /subscription:
     get:
-      operationId: getSubscriptionPlans
-      tags: [subscriptions]
-      summary: Get available subscription plans
+      operationId: getSubscription
+      tags: [subscription]
+      summary: Get subscription details
+      responses:
+        "200":
+          description: Subscription info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /subscription/plans:
+    get:
+      operationId: getPlans
+      tags: [subscription]
+      summary: Get available plans
       responses:
         "200":
           description: List of plans
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/SubscriptionPlan"
-
-  /subscriptions/current:
-    get:
-      operationId: getCurrentSubscription
-      tags: [subscriptions]
-      summary: Get current user subscription
-      responses:
-        "200":
-          description: Current subscription
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Subscription"
-        "404":
-          description: No active subscription
+                $ref: "#/components/schemas/PlansResponse"
 
   /configs:
     get:
@@ -116,76 +127,30 @@ paths:
       summary: Get user VPN configs
       responses:
         "200":
-          description: List of VPN configs
+          description: List of configs
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/VpnConfig"
-    post:
-      operationId: generateConfig
-      tags: [configs]
-      summary: Generate new VPN config
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/GenerateConfigRequest"
-      responses:
-        "201":
-          description: Config generated
+                $ref: "#/components/schemas/ConfigsResponse"
+        "401":
+          description: Not authenticated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/VpnConfig"
-        "403":
-          description: No active subscription
+                $ref: "#/components/schemas/ErrorResponse"
 
-  /configs/{id}:
-    get:
-      operationId: getConfig
-      tags: [configs]
-      summary: Get specific config
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: VPN config
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/VpnConfig"
-    delete:
-      operationId: deleteConfig
-      tags: [configs]
-      summary: Delete VPN config
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: Deleted
-
-  /configs/{id}/download:
+  /configs/{location}/download:
     get:
       operationId: downloadConfig
       tags: [configs]
-      summary: Download config file content
+      summary: Download WireGuard config file for a location
       parameters:
-        - name: id
+        - name: location
           in: path
           required: true
           schema:
-            type: integer
+            type: string
+            enum: [NL, DE, FI, FR, US]
       responses:
         "200":
           description: Config file content
@@ -193,52 +158,76 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConfigDownload"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Subscription inactive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
-  /payments/crypto/create:
+  /payments/cryptobot/invoice:
     post:
-      operationId: createCryptoPayment
+      operationId: createCryptoBotInvoice
       tags: [payments]
-      summary: Create CryptoBot payment invoice
+      summary: Create CryptoBot USDT invoice
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreatePaymentRequest"
+              $ref: "#/components/schemas/CreateInvoiceRequest"
       responses:
         "200":
-          description: Payment invoice
+          description: Invoice created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CryptoPaymentResponse"
+                $ref: "#/components/schemas/InvoiceResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
-  /payments/sbp/create:
+  /payments/sbp/qr:
     post:
-      operationId: createSbpPayment
+      operationId: createSbpQr
       tags: [payments]
-      summary: Create SBP (СБП) payment
+      summary: Create SBP QR code
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreatePaymentRequest"
+              $ref: "#/components/schemas/CreateInvoiceRequest"
       responses:
         "200":
-          description: SBP payment details
+          description: SBP QR created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SbpPaymentResponse"
+                $ref: "#/components/schemas/SbpResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
-  /payments/status/{id}:
+  /payments/status/{invoiceId}:
     get:
       operationId: getPaymentStatus
       tags: [payments]
       summary: Check payment status
       parameters:
-        - name: id
+        - name: invoiceId
           in: path
           required: true
           schema:
@@ -251,18 +240,24 @@ paths:
               schema:
                 $ref: "#/components/schemas/PaymentStatus"
 
-  /user/stats:
+  /dashboard/stats:
     get:
-      operationId: getUserStats
-      tags: [user]
-      summary: Get user usage statistics
+      operationId: getDashboardStats
+      tags: [subscription]
+      summary: Get dashboard statistics
       responses:
         "200":
-          description: User stats
+          description: Dashboard statistics
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserStats"
+                $ref: "#/components/schemas/DashboardStats"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   schemas:
@@ -271,174 +266,155 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
-    LoginRequest:
+    ErrorResponse:
       type: object
       properties:
-        accessKey:
+        error:
           type: string
-          description: "User access key (format: XXXX-XXXX-XXXX-XXXX)"
-      required:
-        - accessKey
+        message:
+          type: string
+      required: [error, message]
 
-    LoginResponse:
+    SuccessResponse:
       type: object
       properties:
         success:
           type: boolean
-        user:
-          $ref: "#/components/schemas/User"
-      required:
-        - success
-        - user
+      required: [success]
 
-    User:
+    LoginRequest:
       type: object
       properties:
-        id:
-          type: integer
-        accessKey:
+        licenseKey:
           type: string
-        createdAt:
-          type: string
-          format: date-time
-        lastSeenAt:
-          type: string
-          format: date-time
-      required:
-        - id
-        - accessKey
-        - createdAt
+          description: License key in format XXXX-XXXX-XXXX-XXXX
+      required: [licenseKey]
 
-    SubscriptionPlan:
+    LoginResult:
       type: object
       properties:
-        id:
-          type: integer
-        name:
+        success:
+          type: boolean
+        licenseKey:
           type: string
-        durationDays:
-          type: integer
-        priceRub:
-          type: number
-        priceCrypto:
-          type: number
-        cryptoCurrency:
+        subscription:
+          $ref: "#/components/schemas/Subscription"
+      required: [success, licenseKey, subscription]
+
+    UserInfo:
+      type: object
+      properties:
+        licenseKey:
           type: string
-        maxDevices:
-          type: integer
-        features:
-          type: array
-          items:
-            type: string
-      required:
-        - id
-        - name
-        - durationDays
-        - priceRub
-        - priceCrypto
-        - cryptoCurrency
-        - maxDevices
-        - features
+        subscription:
+          $ref: "#/components/schemas/Subscription"
+      required: [licenseKey, subscription]
 
     Subscription:
       type: object
       properties:
         id:
           type: integer
-        planId:
-          type: integer
-        planName:
+        licenseKey:
           type: string
+        plan:
+          type: string
+          enum: [start, standard, pro, demo]
         status:
           type: string
           enum: [active, expired, pending]
-        startedAt:
-          type: string
-          format: date-time
         expiresAt:
           type: string
-          format: date-time
-        daysLeft:
+          nullable: true
+        configsCount:
           type: integer
-      required:
-        - id
-        - planId
-        - planName
-        - status
-        - startedAt
-        - expiresAt
-        - daysLeft
+        createdAt:
+          type: string
+      required: [id, licenseKey, plan, status, configsCount, createdAt]
+
+    Plan:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        days:
+          type: integer
+        price:
+          type: number
+        currency:
+          type: string
+        priceUsdt:
+          type: number
+        description:
+          type: string
+        popular:
+          type: boolean
+      required: [id, name, days, price, currency, priceUsdt, description, popular]
+
+    PlansResponse:
+      type: object
+      properties:
+        plans:
+          type: array
+          items:
+            $ref: "#/components/schemas/Plan"
+      required: [plans]
 
     VpnConfig:
       type: object
       properties:
-        id:
-          type: integer
-        name:
+        location:
           type: string
-        serverLocation:
+        locationName:
           type: string
-        serverFlag:
+        flag:
           type: string
-        protocol:
+        server:
           type: string
-        createdAt:
+        status:
           type: string
-          format: date-time
-        isActive:
-          type: boolean
-      required:
-        - id
-        - name
-        - serverLocation
-        - serverFlag
-        - protocol
-        - createdAt
-        - isActive
+          enum: [available, unavailable]
+      required: [location, locationName, flag, server, status]
 
-    GenerateConfigRequest:
+    ConfigsResponse:
       type: object
       properties:
-        name:
-          type: string
-        serverLocation:
-          type: string
-      required:
-        - name
-        - serverLocation
+        configs:
+          type: array
+          items:
+            $ref: "#/components/schemas/VpnConfig"
+        total:
+          type: integer
+      required: [configs, total]
 
     ConfigDownload:
       type: object
       properties:
-        id:
-          type: integer
+        location:
+          type: string
         filename:
           type: string
         content:
           type: string
-          description: WireGuard config file content
-      required:
-        - id
-        - filename
-        - content
+      required: [location, filename, content]
 
-    CreatePaymentRequest:
+    CreateInvoiceRequest:
       type: object
       properties:
         planId:
-          type: integer
-      required:
-        - planId
+          type: string
+      required: [planId]
 
-    CryptoPaymentResponse:
+    InvoiceResponse:
       type: object
       properties:
-        paymentId:
+        invoiceId:
           type: string
-        invoiceUrl:
+        payUrl:
           type: string
         amount:
           type: number
@@ -446,66 +422,50 @@ components:
           type: string
         expiresAt:
           type: string
-          format: date-time
-      required:
-        - paymentId
-        - invoiceUrl
-        - amount
-        - currency
-        - expiresAt
+      required: [invoiceId, payUrl, amount, currency, expiresAt]
 
-    SbpPaymentResponse:
+    SbpResponse:
       type: object
       properties:
-        paymentId:
+        invoiceId:
           type: string
-        qrUrl:
+        qrCode:
           type: string
+          description: Base64 QR code image or URL
         amount:
           type: number
-        bankName:
-          type: string
         expiresAt:
           type: string
-          format: date-time
-      required:
-        - paymentId
-        - qrUrl
-        - amount
-        - bankName
-        - expiresAt
+        phone:
+          type: string
+        bank:
+          type: string
+      required: [invoiceId, qrCode, amount, expiresAt, phone, bank]
 
     PaymentStatus:
       type: object
       properties:
-        paymentId:
+        invoiceId:
           type: string
         status:
           type: string
           enum: [pending, paid, expired, failed]
-        method:
+        paidAt:
           type: string
-      required:
-        - paymentId
-        - status
-        - method
+          nullable: true
+      required: [invoiceId, status]
 
-    UserStats:
+    DashboardStats:
       type: object
       properties:
-        totalConfigs:
+        daysRemaining:
           type: integer
-        activeConfigs:
+        configsAvailable:
           type: integer
-        subscriptionStatus:
-          type: string
-        daysUntilExpiry:
+        locationsCount:
           type: integer
-        accountAgedays:
+        totalDownloads:
           type: integer
-      required:
-        - totalConfigs
-        - activeConfigs
-        - subscriptionStatus
-        - daysUntilExpiry
-        - accountAgeDays
+        isActive:
+          type: boolean
+      required: [daysRemaining, configsAvailable, locationsCount, totalDownloads, isActive]
