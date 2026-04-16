@@ -1,83 +1,90 @@
-import { Router, type IRouter } from "express";
+import { Router } from "express";
+import { db, subscriptionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { db, usersTable, sessionsTable } from "@workspace/db";
-import { LoginWithKeyBody, LoginWithKeyResponse, GetMeResponse } from "@workspace/api-zod";
-import { generateAccessKey, generateSessionToken } from "../lib/keygen";
-import { requireAuth } from "../middlewares/auth";
+import { LoginBody } from "@workspace/api-zod";
 
-const router: IRouter = Router();
+const router = Router();
 
-router.post("/auth/login", async (req, res): Promise<void> => {
-  const parsed = LoginWithKeyBody.safeParse(req.body);
+router.post("/auth/login", async (req, res) => {
+  const parsed = LoginBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
+    res.status(400).json({ error: "validation_error", message: "Invalid request body" });
     return;
   }
 
-  const { accessKey } = parsed.data;
+  const { licenseKey } = parsed.data;
+  const normalizedKey = licenseKey.toUpperCase().trim();
 
-  let [user] = await db
+  const subscription = await db
     .select()
-    .from(usersTable)
-    .where(eq(usersTable.accessKey, accessKey));
+    .from(subscriptionsTable)
+    .where(eq(subscriptionsTable.licenseKey, normalizedKey))
+    .limit(1);
 
-  if (!user) {
-    res.status(401).json({ error: "Invalid access key" });
+  if (subscription.length === 0) {
+    res.status(401).json({ error: "invalid_key", message: "Лицензионный ключ не найден" });
     return;
   }
 
-  const token = generateSessionToken();
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const sub = subscription[0];
 
-  await db.insert(sessionsTable).values({
-    userId: user.id,
-    token,
-    expiresAt,
+  if (sub.status === "expired") {
+    res.status(401).json({ error: "key_expired", message: "Подписка истекла" });
+    return;
+  }
+
+  res.json({
+    success: true,
+    licenseKey: sub.licenseKey,
+    subscription: {
+      id: sub.id,
+      licenseKey: sub.licenseKey,
+      plan: sub.plan,
+      status: sub.status,
+      expiresAt: sub.expiresAt?.toISOString() ?? null,
+      configsCount: sub.configsCount,
+      createdAt: sub.createdAt.toISOString(),
+    },
   });
-
-  res.json(
-    LoginWithKeyResponse.parse({
-      success: true,
-      user: {
-        id: user.id,
-        accessKey: user.accessKey,
-        createdAt: user.createdAt,
-        lastSeenAt: user.lastSeenAt,
-      },
-    })
-  );
-
-  req.log.info({ userId: user.id }, "User logged in");
 });
 
-router.post("/auth/logout", requireAuth, async (req, res): Promise<void> => {
-  const authHeader = req.headers.authorization;
-  if (authHeader) {
-    const token = authHeader.slice(7);
-    await db.delete(sessionsTable).where(eq(sessionsTable.token, token));
-  }
+router.post("/auth/logout", (req, res) => {
   res.json({ success: true });
 });
 
-router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
-  const [user] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.id, req.userId!));
+router.get("/auth/me", async (req, res) => {
+  const licenseKey = req.headers["x-license-key"] as string | undefined;
 
-  if (!user) {
-    res.status(404).json({ error: "User not found" });
+  if (!licenseKey) {
+    res.status(401).json({ error: "unauthorized", message: "Требуется авторизация" });
     return;
   }
 
-  res.json(
-    GetMeResponse.parse({
-      id: user.id,
-      accessKey: user.accessKey,
-      createdAt: user.createdAt,
-      lastSeenAt: user.lastSeenAt,
-    })
-  );
+  const subscription = await db
+    .select()
+    .from(subscriptionsTable)
+    .where(eq(subscriptionsTable.licenseKey, licenseKey.toUpperCase().trim()))
+    .limit(1);
+
+  if (subscription.length === 0) {
+    res.status(401).json({ error: "unauthorized", message: "Ключ не найден" });
+    return;
+  }
+
+  const sub = subscription[0];
+
+  res.json({
+    licenseKey: sub.licenseKey,
+    subscription: {
+      id: sub.id,
+      licenseKey: sub.licenseKey,
+      plan: sub.plan,
+      status: sub.status,
+      expiresAt: sub.expiresAt?.toISOString() ?? null,
+      configsCount: sub.configsCount,
+      createdAt: sub.createdAt.toISOString(),
+    },
+  });
 });
 
 export default router;
