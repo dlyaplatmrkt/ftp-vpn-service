@@ -358,6 +358,13 @@ export async function customFetch<T = unknown>(
     }
   }
 
+  if (typeof window !== "undefined") {
+    const licenseKey = window.localStorage.getItem("ftp_vpn_license_key");
+    if (licenseKey && !headers.has("x-license-key")) {
+      headers.set("x-license-key", licenseKey);
+    }
+  }
+
   const requestInfo = { method, url: resolveUrl(input) };
 
   const response = await fetch(input, { ...init, method, headers });
